@@ -8,6 +8,13 @@ requires-python = ">=3.11"
 authors = [
     {name = "frndvrgs", email = "frndvrgs@gmail.com"},
 ]
+dependencies = [
+    "tree-sitter>=0.23.0",
+    "tree-sitter-python>=0.23.0",
+    "tree-sitter-javascript>=0.23.0",
+    "tree-sitter-typescript>=0.23.0",
+    "tree-sitter-rust>=0.23.0",
+]
 
 [project.scripts]
 pcl = "pcl:main"
