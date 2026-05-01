@@ -87,3 +87,12 @@ def test_count_source_explicit_python_language() -> None:
     assert stats.doc == 1
     assert stats.comment == 1
     assert stats.code == 1
+
+
+def test_comment_only_line_with_multibyte_prefix_is_a_comment() -> None:
+    # Tree-sitter reports column offsets in bytes; this test pins that
+    # _comment_only_lines correctly works in bytes for multi-byte UTF-8 source.
+    src = "\xa0\xa0// pure comment\n"  # two NBSPs (2 UTF-8 bytes each) before //
+    stats = count_source(src, Path("a.js"))
+    assert stats.comment == 1
+    assert stats.code == 0

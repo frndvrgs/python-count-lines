@@ -75,7 +75,11 @@ def _count_with_grammar(text: str, path: Path, spec: LanguageSpec) -> FileStats:
     visited_children = False
     while True:
         node = cursor.node
-        if node is not None and node.type in spec.comment_node_types:
+        if (
+            not visited_children
+            and node is not None
+            and node.type in spec.comment_node_types
+        ):
             node_text = source[node.start_byte : node.end_byte].decode(
                 "utf-8", errors="replace"
             )
@@ -117,24 +121,26 @@ def _count_with_grammar(text: str, path: Path, spec: LanguageSpec) -> FileStats:
 
 def _comment_only_lines(node: Any, lines: list[str]) -> Iterable[int]:
     """Yield line numbers (1-based) where the comment node covers the entire
-    non-whitespace content of the line."""
-    start_row = node.start_point[0]  # 0-based
-    end_row = node.end_point[0]
-    start_col = node.start_point[1]
-    end_col = node.end_point[1]
+    non-whitespace content of the line.
+
+    Tree-sitter reports start_point/end_point columns as byte offsets, so we
+    slice in bytes to stay correct on multi-byte UTF-8 source, then decode
+    back to str for the whitespace check (str.strip strips Unicode whitespace
+    such as NBSP, matching the blank-line semantics elsewhere in this module).
+    """
+    start_row, start_col = node.start_point
+    end_row, end_col = node.end_point
     for row in range(start_row, end_row + 1):
         if row >= len(lines):
             continue
-        line = lines[row]
-        if not line.strip():
+        line_bytes = lines[row].encode("utf-8")
+        if not line_bytes.decode("utf-8", errors="replace").strip():
             continue
-        # Determine the comment's span on this row.
         col_lo = start_col if row == start_row else 0
-        col_hi = end_col if row == end_row else len(line)
-        prefix = line[:col_lo]
-        suffix = line[col_hi:]
+        col_hi = end_col if row == end_row else len(line_bytes)
+        prefix = line_bytes[:col_lo].decode("utf-8", errors="replace")
+        suffix = line_bytes[col_hi:].decode("utf-8", errors="replace")
         if prefix.strip() or suffix.strip():
-            # Trailing or leading code present — not a comment-only line.
             continue
         yield row + 1
 
