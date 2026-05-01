@@ -171,8 +171,6 @@ Create `tests/test_languages_registry.py`:
 ```python
 from __future__ import annotations
 
-import pytest
-
 from pcl.languages.registry import (
     SUPPORTED_LANGUAGES,
     language_for_path,
