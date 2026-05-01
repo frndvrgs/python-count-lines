@@ -1,10 +1,12 @@
 from __future__ import annotations
 
-import ast
-import io
-import tokenize
+from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
+
+from pcl.languages.base import LanguageSpec
+from pcl.languages.registry import language_for_path
 
 
 @dataclass(slots=True)
@@ -32,72 +34,135 @@ def count_file(path: Path) -> FileStats:
     return count_source(text, path)
 
 
-def count_source(text: str, path: Path = Path("<string>")) -> FileStats:
+def count_source(text: str, path: Path = Path("<string>.py")) -> FileStats:
+    spec = language_for_path(path)
+    if spec is None:
+        # Unknown extension — count blank/code only, no comment parsing.
+        return _count_plain(text, path, language="unknown")
+    return _count_with_grammar(text, path, spec)
+
+
+def _count_plain(text: str, path: Path, *, language: str) -> FileStats:
     lines = text.splitlines()
     total = len(lines)
+    blank = sum(1 for line in lines if not line.strip())
+    return FileStats(
+        path=path,
+        language=language,
+        total=total,
+        blank=blank,
+        comment=0,
+        doc=0,
+        code=total - blank,
+    )
+
+
+def _count_with_grammar(text: str, path: Path, spec: LanguageSpec) -> FileStats:
+    from tree_sitter import Parser  # local import to keep cold-start cheap
+
+    source = text.encode("utf-8")
+    parser = Parser(spec.loader())
+    tree = parser.parse(source)
+
+    lines = text.splitlines()
+    total = len(lines)
+
+    comment_lines: set[int] = set()
+    doc_lines: set[int] = set()
+
+    # Walk the tree once collecting comment ranges.
+    cursor = tree.walk()
+    visited_children = False
+    while True:
+        node = cursor.node
+        if node is not None and node.type in spec.comment_node_types:
+            node_text = source[node.start_byte : node.end_byte].decode(
+                "utf-8", errors="replace"
+            )
+            target = doc_lines if spec.is_doc_comment(node_text) else comment_lines
+            # Only count lines whose non-whitespace content lies inside the
+            # node — a `code  // trailing` line should remain code.
+            for line_no in _comment_only_lines(node, lines):
+                target.add(line_no)
+        if not visited_children and cursor.goto_first_child():
+            continue
+        if cursor.goto_next_sibling():
+            visited_children = False
+            continue
+        if not cursor.goto_parent():
+            break
+        visited_children = True
+
+    # Python-specific: structural docstrings (first string-expression in
+    # module/function/class body) become doc lines.
+    if spec.name == "python":
+        doc_lines |= _python_docstring_lines(tree.root_node)
+
+    # Resolve overlap precedence: comment > doc > blank > code.
     blank_set = {i for i, line in enumerate(lines, 1) if not line.strip()}
-
-    comment_set = _find_comment_lines(text, lines)
-    doc_set = _find_docstring_lines(text)
-
-    # Resolve overlaps: comment > doc > blank > code.
-    # Blank lines inside a multi-line docstring count as doc (they're doc content).
-    doc_set -= comment_set
-    blank_set -= comment_set | doc_set
-    code = total - len(blank_set) - len(comment_set) - len(doc_set)
+    doc_lines -= comment_lines
+    blank_set -= comment_lines | doc_lines
+    code = total - len(blank_set) - len(comment_lines) - len(doc_lines)
 
     return FileStats(
         path=path,
-        language="python",
+        language=spec.name,
         total=total,
         blank=len(blank_set),
-        comment=len(comment_set),
-        doc=len(doc_set),
+        comment=len(comment_lines),
+        doc=len(doc_lines),
         code=code,
     )
 
 
-def _find_comment_lines(text: str, lines: list[str]) -> set[int]:
-    """Return line numbers (1-based) that are comment-only.
+def _comment_only_lines(node: Any, lines: list[str]) -> Iterable[int]:
+    """Yield line numbers (1-based) where the comment node covers the entire
+    non-whitespace content of the line."""
+    start_row = node.start_point[0]  # 0-based
+    end_row = node.end_point[0]
+    start_col = node.start_point[1]
+    end_col = node.end_point[1]
+    for row in range(start_row, end_row + 1):
+        if row >= len(lines):
+            continue
+        line = lines[row]
+        if not line.strip():
+            continue
+        # Determine the comment's span on this row.
+        col_lo = start_col if row == start_row else 0
+        col_hi = end_col if row == end_row else len(line)
+        prefix = line[:col_lo]
+        suffix = line[col_hi:]
+        if prefix.strip() or suffix.strip():
+            # Trailing or leading code present — not a comment-only line.
+            continue
+        yield row + 1
 
-    A comment-only line is one whose non-whitespace content begins with '#'.
-    Lines with code followed by a trailing '# comment' are NOT counted here —
-    they remain code lines.
-    """
+
+def _python_docstring_lines(root: Any) -> set[int]:
+    """Walk the tree-sitter parse for module/class/function bodies whose first
+    statement is a bare string expression."""
     result: set[int] = set()
-    try:
-        for tok in tokenize.generate_tokens(io.StringIO(text).readline):
-            if tok.type != tokenize.COMMENT:
-                continue
-            line_no = tok.start[0]
-            if 1 <= line_no <= len(lines) and lines[line_no - 1].lstrip().startswith("#"):
-                result.add(line_no)
-    except (tokenize.TokenError, IndentationError, SyntaxError):
-        # Fallback for files tokenize can't parse: scan textually.
-        for i, line in enumerate(lines, 1):
-            if line.lstrip().startswith("#"):
-                result.add(i)
+    targets = {"module", "function_definition", "class_definition"}
+    stack = [root]
+    while stack:
+        node = stack.pop()
+        if node.type in targets:
+            body = _python_body(node)
+            if body and body[0].type == "expression_statement":
+                expr = body[0]
+                if expr.child_count == 1 and expr.children[0].type == "string":
+                    s, e = expr.start_point[0], expr.end_point[0]
+                    result.update(range(s + 1, e + 2))  # 1-based, inclusive
+        stack.extend(node.children)
     return result
 
 
-def _find_docstring_lines(text: str) -> set[int]:
-    """Return line numbers occupied by module/class/function docstrings."""
-    result: set[int] = set()
-    try:
-        tree = ast.parse(text)
-    except SyntaxError:
-        return result
-
-    targets = (ast.Module, ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)
-    for node in ast.walk(tree):
-        if not isinstance(node, targets) or not node.body:
-            continue
-        first = node.body[0]
-        if not isinstance(first, ast.Expr):
-            continue
-        value = first.value
-        if isinstance(value, ast.Constant) and isinstance(value.value, str):
-            start = first.lineno
-            end = first.end_lineno or start
-            result.update(range(start, end + 1))
-    return result
+def _python_body(node: Any) -> list[Any]:
+    # `module` has no "body" field — its named children ARE the body.
+    if node.type == "module":
+        return [c for c in node.children if c.is_named]
+    block = node.child_by_field_name("body")
+    if block is None:
+        return []
+    return [c for c in block.children if c.is_named]

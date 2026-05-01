@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from pathlib import Path
 from textwrap import dedent
 
 from pcl.counter import count_source
@@ -77,3 +78,12 @@ def test_filestats_carries_language_tag() -> None:
     src = "x = 1\n"
     stats = count_source(src)
     assert stats.language == "python"
+
+
+def test_count_source_explicit_python_language() -> None:
+    src = '"""doc."""\nx = 1\n# c\n'
+    stats = count_source(src, Path("a.py"))
+    assert stats.language == "python"
+    assert stats.doc == 1
+    assert stats.comment == 1
+    assert stats.code == 1
