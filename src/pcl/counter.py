@@ -10,15 +10,16 @@ from pathlib import Path
 @dataclass(slots=True)
 class FileStats:
     path: Path
+    language: str
     total: int
     blank: int
     comment: int
-    docstring: int
+    doc: int
     code: int
 
     @property
     def stripped(self) -> int:
-        """Total minus comment-only lines (kept docstrings — they're real source)."""
+        """Total minus comment-only lines (kept doc lines — they're real source)."""
         return self.total - self.comment
 
 
@@ -33,20 +34,21 @@ def count_source(text: str, path: Path = Path("<string>")) -> FileStats:
     blank_set = {i for i, line in enumerate(lines, 1) if not line.strip()}
 
     comment_set = _find_comment_lines(text, lines)
-    docstring_set = _find_docstring_lines(text)
+    doc_set = _find_docstring_lines(text)
 
-    # Resolve overlaps: comment > docstring > blank > code.
-    # Blank lines inside a multi-line docstring count as docstring (they're doc content).
-    docstring_set -= comment_set
-    blank_set -= comment_set | docstring_set
-    code = total - len(blank_set) - len(comment_set) - len(docstring_set)
+    # Resolve overlaps: comment > doc > blank > code.
+    # Blank lines inside a multi-line docstring count as doc (they're doc content).
+    doc_set -= comment_set
+    blank_set -= comment_set | doc_set
+    code = total - len(blank_set) - len(comment_set) - len(doc_set)
 
     return FileStats(
         path=path,
+        language="python",
         total=total,
         blank=len(blank_set),
         comment=len(comment_set),
-        docstring=len(docstring_set),
+        doc=len(doc_set),
         code=code,
     )
 

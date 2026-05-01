@@ -20,7 +20,7 @@ def test_blank_comment_code_split() -> None:
     assert stats.total == 6
     assert stats.blank == 1
     assert stats.comment == 2
-    assert stats.docstring == 0
+    assert stats.doc == 0
     assert stats.code == 3
 
 
@@ -39,7 +39,7 @@ def test_module_and_function_docstrings() -> None:
     )
     stats = count_source(src)
     # Module docstring: 4 lines (line 1-4). Function docstring: 1 line.
-    assert stats.docstring == 5
+    assert stats.doc == 5
     assert stats.comment == 0
     # blank line between docstring and def
     assert stats.blank == 1
@@ -71,3 +71,9 @@ def test_syntax_error_falls_back_to_textual_comment_scan() -> None:
     src = "def broken(:\n    # still a comment line\n    pass\n"
     stats = count_source(src)
     assert stats.comment >= 1
+
+
+def test_filestats_carries_language_tag() -> None:
+    src = "x = 1\n"
+    stats = count_source(src)
+    assert stats.language == "python"

@@ -38,8 +38,8 @@ class Report:
         return sum(f.comment for f in self.files)
 
     @property
-    def docstring(self) -> int:
-        return sum(f.docstring for f in self.files)
+    def doc(self) -> int:
+        return sum(f.doc for f in self.files)
 
     @property
     def code(self) -> int:
@@ -90,7 +90,7 @@ def render(report: Report, *, strip_comments: bool) -> str:
         ("Python files", report.file_count, "", report.baseline_files if show_delta else None),
         (headline_label, headline_value, BOLD, headline_baseline if show_delta else None),
         ("  code", report.code, DIM, None),
-        ("  docstrings", report.docstring, DIM, None),
+        ("  doc lines", report.doc, DIM, None),
         ("  comments", report.comment, DIM, None),
         ("  blank", report.blank, DIM, None),
     ]

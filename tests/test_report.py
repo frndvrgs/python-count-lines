@@ -16,10 +16,11 @@ def _strip(s: str) -> str:
 def _stats(name: str, total: int, *, comment: int = 0) -> FileStats:
     return FileStats(
         path=Path(f"/repo/{name}"),
+        language="python",
         total=total,
         blank=0,
         comment=comment,
-        docstring=0,
+        doc=0,
         code=total - comment,
     )
 
@@ -60,6 +61,6 @@ def test_render_with_strip_comments_uses_stripped_baseline() -> None:
     report = Report(root=Path("/repo"), excludes=["t.py"], files=kept, filtered=filtered)
     out = _strip(render(report, strip_comments=True))
 
-    # Headline: code+docstrings = total - comments. kept=90, baseline=180.
+    # Headline: code+doc = total - comments. kept=90, baseline=180.
     assert "Code (no comments)" in out
     assert "(-50% of 180)" in out
