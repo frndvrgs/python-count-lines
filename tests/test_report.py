@@ -13,10 +13,10 @@ def _strip(s: str) -> str:
     return ANSI.sub("", s)
 
 
-def _stats(name: str, total: int, *, comment: int = 0) -> FileStats:
+def _stats(name: str, total: int, *, comment: int = 0, language: str = "python") -> FileStats:
     return FileStats(
         path=Path(f"/repo/{name}"),
-        language="python",
+        language=language,
         total=total,
         blank=0,
         comment=comment,
@@ -48,7 +48,7 @@ def test_render_with_filtered_shows_delta_on_top_rows() -> None:
     assert "(-25% of 200)" in out
     # Folders baseline is 1 (all files share /repo), no delta when value == baseline
     assert "Folders" in out
-    # Python files: 2 of 4 -> -50%
+    # Source files: 2 of 4 -> -50%
     assert "(-50% of 4)" in out
     # Sub-breakdown rows must NOT carry the annotation
     code_line = next(line for line in out.splitlines() if "code" in line and "Code" not in line)
@@ -64,3 +64,26 @@ def test_render_with_strip_comments_uses_stripped_baseline() -> None:
     # Headline: code+doc = total - comments. kept=90, baseline=180.
     assert "Code (no comments)" in out
     assert "(-50% of 180)" in out
+
+
+def test_render_shows_per_language_counts() -> None:
+    report = Report(
+        root=Path("/repo"),
+        excludes=[],
+        files=[
+            _stats("a.py", 10),
+            _stats("b.py", 20),
+            _stats("c.rs", 30, language="rust"),
+        ],
+    )
+    out = _strip(render(report, strip_comments=False))
+    # Per-language rows are indented and styled DIM; check both lang
+    # names and counts appear after the "Source files" row.
+    assert "Source files" in out
+    assert "python" in out
+    assert "rust" in out
+    # Counts should appear: 2 python files, 1 rust file.
+    python_line = next(line for line in out.splitlines() if "python" in line and "Code" not in line)
+    rust_line = next(line for line in out.splitlines() if "rust" in line and "Code" not in line)
+    assert "2" in python_line
+    assert "1" in rust_line

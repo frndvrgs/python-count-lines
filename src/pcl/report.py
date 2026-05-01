@@ -66,14 +66,14 @@ def render(report: Report, *, strip_comments: bool) -> str:
     out: list[str] = []
     p = out.append
 
-    p(f"\n{BOLD}python-count-lines{RESET}")
+    p(f"\n{BOLD}count-lines{RESET}")
     label = "Source:" if report.display_root else "Path:"
     p(f"  {DIM}{label:<9}{RESET}{report.display_root or report.root}")
     if report.excludes:
         p(f"  {DIM}Excludes:{RESET} {', '.join(report.excludes)}")
 
     if not report.files:
-        p(f"\n  {YELLOW}No Python files found.{RESET}\n")
+        p(f"\n  {YELLOW}No source files found.{RESET}\n")
         return "\n".join(out) + "\n"
 
     headline_label = "Code (no comments)" if strip_comments else "Total lines"
@@ -84,16 +84,26 @@ def render(report: Report, *, strip_comments: bool) -> str:
 
     show_delta = bool(report.filtered)
 
+    lang_counts: dict[str, int] = {}
+    for f in report.files:
+        lang_counts[f.language] = lang_counts.get(f.language, 0) + 1
+
     # (label, value, style, baseline-or-None). Sub-breakdown rows have no baseline annotation.
     rows: list[tuple[str, int, str, int | None]] = [
         ("Folders", report.folder_count, "", report.baseline_folders if show_delta else None),
-        ("Python files", report.file_count, "", report.baseline_files if show_delta else None),
-        (headline_label, headline_value, BOLD, headline_baseline if show_delta else None),
-        ("  code", report.code, DIM, None),
-        ("  doc lines", report.doc, DIM, None),
-        ("  comments", report.comment, DIM, None),
-        ("  blank", report.blank, DIM, None),
+        ("Source files", report.file_count, "", report.baseline_files if show_delta else None),
     ]
+    for lang in sorted(lang_counts, key=lambda name: (-lang_counts[name], name)):
+        rows.append((f"  {lang}", lang_counts[lang], DIM, None))
+    rows.extend(
+        [
+            (headline_label, headline_value, BOLD, headline_baseline if show_delta else None),
+            ("  code", report.code, DIM, None),
+            ("  doc lines", report.doc, DIM, None),
+            ("  comments", report.comment, DIM, None),
+            ("  blank", report.blank, DIM, None),
+        ]
+    )
 
     label_w = max(len(lbl) for lbl, _, _, _ in rows) + 2
     value_w = max(len(f"{val:,}") for _, val, _, _ in rows)
