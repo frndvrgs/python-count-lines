@@ -123,7 +123,11 @@ class FileStats:
 
     @property
     def stripped(self) -> int:
-        """Total minus comment-only lines (kept doc lines — they're real source)."""
+        """Total minus comment-only lines.
+
+        Doc lines (Python docstrings, JSDoc, Rust ///, //!) are kept — they're
+        intentional API documentation, not noise.
+        """
         return self.total - self.comment
 ```
 
