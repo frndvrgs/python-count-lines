@@ -1,13 +1,40 @@
 from __future__ import annotations
 
+import functools
 import os
-from typing import Any
+
+import tree_sitter_javascript
+import tree_sitter_python
+import tree_sitter_rust
+import tree_sitter_typescript
+from tree_sitter import Language
 
 from pcl.languages.base import LanguageSpec
 
 
-def _not_yet(name: str) -> Any:
-    raise NotImplementedError(f"grammar loader for {name} wired in Task 3")
+@functools.cache
+def _python_lang() -> Language:
+    return Language(tree_sitter_python.language())
+
+
+@functools.cache
+def _javascript_lang() -> Language:
+    return Language(tree_sitter_javascript.language())
+
+
+@functools.cache
+def _typescript_lang() -> Language:
+    return Language(tree_sitter_typescript.language_typescript())
+
+
+@functools.cache
+def _tsx_lang() -> Language:
+    return Language(tree_sitter_typescript.language_tsx())
+
+
+@functools.cache
+def _rust_lang() -> Language:
+    return Language(tree_sitter_rust.language())
 
 
 def _never_doc(_text: str) -> bool:
@@ -17,7 +44,7 @@ def _never_doc(_text: str) -> bool:
 PYTHON = LanguageSpec(
     name="python",
     extensions=(".py",),
-    loader=lambda: _not_yet("python"),
+    loader=_python_lang,
     comment_node_types=frozenset({"comment"}),
     string_node_types=frozenset({"string"}),
     is_doc_comment=_never_doc,  # Python docs are structural, handled in counter
@@ -26,7 +53,7 @@ PYTHON = LanguageSpec(
 JAVASCRIPT = LanguageSpec(
     name="javascript",
     extensions=(".js", ".mjs", ".cjs"),
-    loader=lambda: _not_yet("javascript"),
+    loader=_javascript_lang,
     comment_node_types=frozenset({"comment"}),
     string_node_types=frozenset({"string", "template_string"}),
     is_doc_comment=lambda text: text.startswith("/**") and not text.startswith("/***"),
@@ -35,7 +62,8 @@ JAVASCRIPT = LanguageSpec(
 JSX = LanguageSpec(
     name="jsx",
     extensions=(".jsx",),
-    loader=lambda: _not_yet("jsx"),
+    # JSX is a superset handled by the JS grammar; share the cached Language.
+    loader=_javascript_lang,
     comment_node_types=frozenset({"comment"}),
     string_node_types=frozenset({"string", "template_string"}),
     is_doc_comment=lambda text: text.startswith("/**") and not text.startswith("/***"),
@@ -44,7 +72,7 @@ JSX = LanguageSpec(
 TYPESCRIPT = LanguageSpec(
     name="typescript",
     extensions=(".ts",),
-    loader=lambda: _not_yet("typescript"),
+    loader=_typescript_lang,
     comment_node_types=frozenset({"comment"}),
     string_node_types=frozenset({"string", "template_string"}),
     is_doc_comment=lambda text: text.startswith("/**") and not text.startswith("/***"),
@@ -53,7 +81,7 @@ TYPESCRIPT = LanguageSpec(
 TSX = LanguageSpec(
     name="tsx",
     extensions=(".tsx",),
-    loader=lambda: _not_yet("tsx"),
+    loader=_tsx_lang,
     comment_node_types=frozenset({"comment"}),
     string_node_types=frozenset({"string", "template_string"}),
     is_doc_comment=lambda text: text.startswith("/**") and not text.startswith("/***"),
@@ -61,6 +89,10 @@ TSX = LanguageSpec(
 
 
 def _rust_is_doc(text: str) -> bool:
+    # ORDER MATTERS: //// must be checked before /// (else Rust's regular
+    # //// comments would be misclassified as doc comments). Likewise /***
+    # must be excluded before /** to avoid 3-star banner comments being
+    # treated as JSDoc.
     # Outer doc: ///, inner doc: //!, block outer: /** ..., block inner: /*! ...
     # Exclude /// followed by / (////) which is just a regular comment in Rust.
     if text.startswith("////"):
@@ -77,7 +109,7 @@ def _rust_is_doc(text: str) -> bool:
 RUST = LanguageSpec(
     name="rust",
     extensions=(".rs",),
-    loader=lambda: _not_yet("rust"),
+    loader=_rust_lang,
     comment_node_types=frozenset({"line_comment", "block_comment"}),
     string_node_types=frozenset({"string_literal", "raw_string_literal"}),
     is_doc_comment=_rust_is_doc,

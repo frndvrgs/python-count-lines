@@ -2,7 +2,10 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Any
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from tree_sitter import Language
 
 
 @dataclass(frozen=True, slots=True)
@@ -21,7 +24,7 @@ class LanguageSpec:
 
     name: str
     extensions: tuple[str, ...]
-    loader: Callable[[], Any]
+    loader: Callable[[], Language]
     comment_node_types: frozenset[str]
     string_node_types: frozenset[str]
     is_doc_comment: Callable[[str], bool]

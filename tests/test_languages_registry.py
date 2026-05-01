@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from tree_sitter import Language as TSLanguage
+
 from pcl.languages.registry import (
     SUPPORTED_LANGUAGES,
     language_for_name,
@@ -47,3 +49,9 @@ def test_supported_languages_listing_is_stable_and_unique() -> None:
     assert names == sorted(set(names))
     assert "python" in names
     assert "rust" in names
+
+
+def test_every_language_loads_a_real_grammar() -> None:
+    for spec in SUPPORTED_LANGUAGES:
+        lang = spec.loader()
+        assert isinstance(lang, TSLanguage), f"{spec.name} did not return a Language"
