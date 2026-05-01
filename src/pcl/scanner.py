@@ -78,8 +78,3 @@ def iter_source_files(
             if is_excluded(file_path.relative_to(root), excludes):
                 continue
             yield file_path
-
-
-def iter_python_files(root: Path, excludes: list[str]) -> Iterator[Path]:
-    """Deprecated shim — Task 9 removes the last caller (pcl.cli)."""
-    return iter_source_files(root, languages={"python"}, excludes=excludes)

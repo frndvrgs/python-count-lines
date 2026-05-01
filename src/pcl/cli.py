@@ -6,16 +6,20 @@ from importlib.metadata import version
 from pathlib import Path
 
 from pcl.counter import count_file
+from pcl.languages.registry import SUPPORTED_LANGUAGES
 from pcl.remote import is_remote_url, materialise_remote
 from pcl.report import Report, render
-from pcl.scanner import is_excluded, iter_python_files
+from pcl.scanner import is_excluded, iter_source_files
 from pcl.styles import DIM, RESET
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(
         prog="pcl",
-        description="Count lines of code in a Python project (local path or remote git URL).",
+        description=(
+            "Count lines of code across multiple languages (Python, JS/TS, Rust). "
+            "Local path or remote git URL."
+        ),
     )
     parser.add_argument(
         "-v", "--version",
@@ -40,17 +44,33 @@ def main() -> None:
         action="store_true",
         help="exclude comment-only lines from the headline LOC total",
     )
+    parser.add_argument(
+        "--lang",
+        nargs="+",
+        default=None,
+        metavar="NAME",
+        choices=[spec.name for spec in SUPPORTED_LANGUAGES],
+        help="languages to include (default: all supported)",
+    )
     args = parser.parse_args()
+
+    languages = set(args.lang) if args.lang else None
 
     if is_remote_url(args.target):
         with materialise_remote(args.target) as cloned:
             sys.stderr.write(f"{DIM}Cloning {args.target}...{RESET}\n")
-            _scan_and_render(cloned, args.exclude, args.strip_comments, display=args.target)
+            _scan_and_render(
+                cloned,
+                args.exclude,
+                args.strip_comments,
+                languages=languages,
+                display=args.target,
+            )
     else:
         root = Path(args.target).expanduser().resolve()
         if not root.exists():
             parser.error(f"path not found: {root}")
-        _scan_and_render(root, args.exclude, args.strip_comments)
+        _scan_and_render(root, args.exclude, args.strip_comments, languages=languages)
 
     sys.exit(0)
 
@@ -59,12 +79,14 @@ def _scan_and_render(
     root: Path,
     excludes: list[str],
     strip_comments: bool,
+    *,
+    languages: set[str] | None,
     display: str | None = None,
 ) -> None:
     # Walk once with defaults-only; partition by user patterns afterwards
     # so the report can show how much the excludes filtered out.
     report = Report(root=root, excludes=list(excludes), display_root=display)
-    for fp in iter_python_files(root, []):
+    for fp in iter_source_files(root, languages=languages, excludes=[]):
         stats = count_file(fp)
         if excludes and is_excluded(fp.relative_to(root), excludes):
             report.filtered.append(stats)
