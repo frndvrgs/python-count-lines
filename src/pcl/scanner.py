@@ -5,6 +5,8 @@ from collections.abc import Iterator
 from fnmatch import fnmatch
 from pathlib import Path
 
+from pcl.languages.registry import SUPPORTED_LANGUAGES
+
 DEFAULT_SKIP_DIRS = frozenset({"__pycache__", "node_modules"})
 
 
@@ -33,14 +35,31 @@ def is_excluded(rel_path: Path, patterns: list[str]) -> bool:
     return False
 
 
-def iter_python_files(root: Path, excludes: list[str]) -> Iterator[Path]:
-    """Yield .py files under root, honouring excludes.
+def iter_source_files(
+    root: Path,
+    *,
+    languages: set[str] | None,
+    excludes: list[str],
+) -> Iterator[Path]:
+    """Yield source files under root with extensions in supported languages.
 
-    If root is a single .py file, yield it directly.
+    `languages=None` means all supported languages. Unknown extensions are
+    skipped silently — this is not a generic file walker.
     """
+    selected = (
+        {ext for spec in SUPPORTED_LANGUAGES for ext in spec.extensions}
+        if languages is None
+        else {
+            ext
+            for spec in SUPPORTED_LANGUAGES
+            if spec.name in languages
+            for ext in spec.extensions
+        }
+    )
+
     root = root.resolve()
     if root.is_file():
-        if root.suffix == ".py":
+        if root.suffix.lower() in selected:
             yield root
         return
 
@@ -52,9 +71,15 @@ def iter_python_files(root: Path, excludes: list[str]) -> Iterator[Path]:
             if not is_excluded((current / d).relative_to(root), excludes)
         ]
         for fname in files:
-            if not fname.endswith(".py"):
+            ext = os.path.splitext(fname)[1].lower()
+            if ext not in selected:
                 continue
             file_path = current / fname
             if is_excluded(file_path.relative_to(root), excludes):
                 continue
             yield file_path
+
+
+def iter_python_files(root: Path, excludes: list[str]) -> Iterator[Path]:
+    """Deprecated shim — Task 9 removes the last caller (pcl.cli)."""
+    return iter_source_files(root, languages={"python"}, excludes=excludes)
