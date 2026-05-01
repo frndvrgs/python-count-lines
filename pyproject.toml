@@ -1,0 +1,47 @@
+[project]
+name = "python-count-lines"
+version = "0.1.0"
+description = "Count lines of code in Python projects with comment-aware breakdowns"
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.11"
+authors = [
+    {name = "frndvrgs", email = "frndvrgs@gmail.com"},
+]
+
+[project.scripts]
+pcl = "pcl:main"
+
+[project.urls]
+Repository = "https://github.com/frndvrgs/python-count-lines"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/pcl"]
+
+[project.optional-dependencies]
+dev = [
+    "ruff>=0.15.9",
+    "mypy>=1.20.0",
+    "pytest>=8.3.0",
+]
+
+[tool.ruff]
+line-length = 120
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+
+[tool.ruff.format]
+quote-style = "double"
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
