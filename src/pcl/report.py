@@ -131,7 +131,7 @@ def _delta(value: int, baseline: int | None) -> str:
     if baseline is None or baseline <= 0 or baseline == value:
         return ""
     pct = round((baseline - value) / baseline * 100)
-    return f" {DIM}(-{pct}% of {baseline:,}){RESET}"
+    return f" {DIM}| -{pct}% of {baseline:,}{RESET}"
 
 
 def _relpath(path: Path, root: Path) -> str:

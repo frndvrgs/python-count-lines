@@ -45,11 +45,11 @@ def test_render_with_filtered_shows_delta_on_top_rows() -> None:
     out = _strip(render(report, strip_comments=False))
 
     # baseline = 200, kept = 150, reduction = 25%
-    assert "(-25% of 200)" in out
+    assert "| -25% of 200" in out
     # Folders baseline is 1 (all files share /repo), no delta when value == baseline
     assert "Folders" in out
     # Source files: 2 of 4 -> -50%
-    assert "(-50% of 4)" in out
+    assert "| -50% of 4" in out
     # Sub-breakdown rows must NOT carry the annotation
     code_line = next(line for line in out.splitlines() if "code" in line and "Code" not in line)
     assert "% of" not in code_line
@@ -63,7 +63,7 @@ def test_render_with_strip_comments_uses_stripped_baseline() -> None:
 
     # Headline: code+doc = total - comments. kept=90, baseline=180.
     assert "Code (no comments)" in out
-    assert "(-50% of 180)" in out
+    assert "| -50% of 180" in out
 
 
 def test_render_shows_per_language_counts() -> None:

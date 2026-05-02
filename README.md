@@ -65,9 +65,9 @@ When `--exclude` is used, the headline rows (folders, files, total) carry a dim
 delta showing how much was filtered out:
 
 ```
-  Folders         1 (-50% of 2)
-  Source files    7 (-36% of 11)
-  Total lines   427 (-26% of 580)
+  Folders         1 | -50% of 2
+  Source files    7 | -36% of 11
+  Total lines   427 | -26% of 580
 ```
 
 ## Remote repositories
