@@ -1,6 +1,6 @@
 [project]
 name = "python-count-lines"
-version = "0.1.1"
+version = "0.1.2"
 description = "Count lines of code in Python projects with comment-aware breakdowns"
 readme = "README.md"
 license = "MIT"
