@@ -77,4 +77,10 @@ def iter_source_files(
             file_path = current / fname
             if is_excluded(file_path.relative_to(root), excludes):
                 continue
+            # os.walk lists symlinks (incl. broken ones) among files; a source
+            # file must be a regular, resolvable file. os.path.isfile swallows
+            # OSError and returns False for a dangling symlink, so it is never
+            # yielded to the reader — a broken link in the tree can't abort a scan.
+            if not os.path.isfile(file_path):
+                continue
             yield file_path

@@ -57,15 +57,19 @@ def main() -> None:
     languages = set(args.lang) if args.lang else None
 
     if is_remote_url(args.target):
-        with materialise_remote(args.target) as cloned:
-            sys.stderr.write(f"{DIM}Cloning {args.target}...{RESET}\n")
-            _scan_and_render(
-                cloned,
-                args.exclude,
-                args.strip_comments,
-                languages=languages,
-                display=args.target,
-            )
+        try:
+            with materialise_remote(args.target) as cloned:
+                sys.stderr.write(f"{DIM}Cloning {args.target}...{RESET}\n")
+                _scan_and_render(
+                    cloned,
+                    args.exclude,
+                    args.strip_comments,
+                    languages=languages,
+                    display=args.target,
+                )
+        except RuntimeError as exc:
+            sys.stderr.write(f"pcl: {exc}\n")
+            sys.exit(1)
     else:
         root = Path(args.target).expanduser().resolve()
         if not root.exists():
@@ -87,7 +91,12 @@ def _scan_and_render(
     # so the report can show how much the excludes filtered out.
     report = Report(root=root, excludes=list(excludes), display_root=display)
     for fp in iter_source_files(root, languages=languages, excludes=[]):
-        stats = count_file(fp)
+        try:
+            stats = count_file(fp)
+        except OSError:
+            # Vanished between walk and read, permission-denied, or an unresolvable
+            # link — one unreadable file must not abort the whole scan.
+            continue
         if excludes and is_excluded(fp.relative_to(root), excludes):
             report.filtered.append(stats)
         else:

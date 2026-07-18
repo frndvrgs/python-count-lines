@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- A dangling symlink with a source extension no longer aborts the scan. The
+  walker skips non-regular files (`os.path.isfile`, which returns `False` for a
+  broken link), and file reads are guarded so a vanished or permission-denied
+  file is skipped rather than raising. Previously a broken symlink such as
+  `examples/voip/lib/matrix.js` (present in some repos) crashed `pcl` with a
+  `FileNotFoundError` traceback — even when its directory was `--exclude`d, since
+  filtered files are still counted for the `(-X% of N)` delta.
+- A failed remote clone (e.g. a repository that does not exist) now prints a
+  concise `pcl: git clone failed: ...` message and exits non-zero, instead of
+  surfacing a raw `RuntimeError` traceback.
+
 ## [0.1.1] - 2026-05-10
 
 ### Added

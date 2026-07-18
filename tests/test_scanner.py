@@ -50,3 +50,19 @@ def test_iter_source_files_handles_single_file(tmp_path: Path) -> None:
 def test_iter_source_files_skips_unsupported_extensions(tmp_path: Path) -> None:
     (tmp_path / "a.go").write_text("package main\n")
     assert list(iter_source_files(tmp_path, languages=None, excludes=[])) == []
+
+
+def test_iter_source_files_skips_broken_symlink(tmp_path: Path) -> None:
+    (tmp_path / "real.py").write_text("x = 1\n")
+    (tmp_path / "dangling.py").symlink_to(tmp_path / "missing_target.py")
+
+    found = sorted(p.name for p in iter_source_files(tmp_path, languages=None, excludes=[]))
+    assert found == ["real.py"]
+
+
+def test_iter_source_files_follows_symlink_to_real_file(tmp_path: Path) -> None:
+    (tmp_path / "real.py").write_text("x = 1\n")
+    (tmp_path / "link.py").symlink_to(tmp_path / "real.py")
+
+    found = sorted(p.name for p in iter_source_files(tmp_path, languages=None, excludes=[]))
+    assert found == ["link.py", "real.py"]
